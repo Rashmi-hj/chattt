@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chat - {{ username }}</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .header {
+      margin-bottom: 20px;
+    }
+    .current-user {
+      font-weight: bold;
+      color: green;
+      margin-bottom: 10px;
+    }
+    .selected-user-info {
+      background-color: #e9ecef;
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 10px;
+    }
+    .notifications {
+      background-color: #fff3cd;
+      border: 1px solid #ffeaa7;
+      border-radius: 5px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+    .notification {
+      padding: 8px;
+      margin: 5px 0;
+      background-color: #ffeaa7;
+      border-radius: 3px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .notification-message {
+      flex: 1;
+    }
+    .notification-actions {
+      margin-left: 10px;
+    }
+    .clear-all {
+      background-color: #dc3545;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .mark-read {
+      background-color: #28a745;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 12px;
+      margin-left: 5px;
+    }
+    .container {
+      display: flex;
+      flex: 1;
+      gap: 20px;
+    }
+    .user-list {
+      width: 200px;
+      border-right: 1px solid #ccc;
+      padding-right: 20px;
+    }
+    .user-item {
+      padding: 10px;
+      margin: 5px 0;
+      cursor: pointer;
+      border-radius: 5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .user-item:hover {
+      background-color: #f0f0f0;
+    }
+    .user-item.selected {
+      background-color: #007bff;
+      color: white;
+    }
+    .notification-badge {
+      background-color: #dc3545;
+      color: white;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .chat-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .messages {
+      flex: 1;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      padding: 10px;
+      overflow-y: auto;
+      margin-bottom: 10px;
+      min-height: 300px;
+    }
+    .message {
+      margin: 10px 0;
+      padding: 8px;
+      border-radius: 5px;
+    }
+    .message.from-me {
+      background-color: #d1ecf1;
+      margin-left: 50px;
+    }
+    .message.to-me {
+      background-color: #f8d7da;
+      margin-right: 50px;
+    }
+    .message-sender {
+      font-weight: bold;
+      font-size: 0.9em;
+    }
+    .message-time {
+      font-size: 0.8em;
+      color: #666;
+      float: right;
+    }
+    .input-area {
+      display: flex;
+      gap: 10px;
+    }
+    .input-area input {
+      flex: 1;
+      padding: 10px;
+      font-size: 16px;
+    }
+    .input-area button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .input-area button:disabled {
+      background-color: #6c757d;
+      cursor: not-allowed;
+    }
+    .notification-preview {
+      font-size: 0.9em;
+      color: #666;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h2>HRMSETU-CHAT-SYSTEM</h2>
+    <div class="current-user">
+      Logged in as: <strong>{{ username }}</strong>
+    </div>
+
+    <!-- Notifications -->
+    {% if notifications %}
+    <div class="notifications">
+      <h4>📢 Notifications ({{ notifications|length }})</h4>
+      {% for notif in notifications %}
+      <div class="notification">
+        <div class="notification-message">
+          <strong>{{ notif.from_user }}</strong> sent you a message: "{{ notif.message }}"
+          <small>({{ notif.timestamp.strftime('%H:%M:%S') if notif.timestamp.__class__.__name__ == 'datetime' else notif.timestamp }})</small>
+        </div>
+        <div class="notification-actions">
+          <button class="mark-read" onclick="markAsRead('{{ notif._id }}')">Mark Read</button>
+        </div>
+      </div>
+      {% endfor %}
+      <button class="clear-all" onclick="clearAllNotifications()">Clear All</button>
+    </div>
+    {% endif %}
+
+    <!-- Selected User Info -->
+    {% if selected_user %}
+    <div class="selected-user-info">
+      Chatting with: <strong>{{ selected_user }}</strong>
+    </div>
+    {% else %}
+    <div class="selected-user-info">
+      Select a user to start chatting
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="container">
+    <!-- User list -->
+    <div class="user-list">
+      <h3>Other Users:</h3>
+      {% for user in users %}
+        <div class="user-item {% if selected_user == user %}selected{% endif %}"
+             onclick="selectUser('{{ user }}')">
+          <div>
+            <div>{{ user }}</div>
+            {% set user_notifications = [] %}
+            {% for notif in notifications %}
+              {% if notif.from_user == user %}
+                {% set _ = user_notifications.append(notif) %}
+              {% endif %}
+            {% endfor %}
+            {% if user_notifications %}
+            <div class="notification-preview">
+              {{ user_notifications[0].message[:30] }}{% if user_notifications[0].message|length > 30 %}...{% endif %}
+            </div>
+            {% endif %}
+          </div>
+          {% if user_notifications %}
+          <span class="notification-badge">{{ user_notifications|length }}</span>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+
+    <!-- Chat area -->
+    <div class="chat-area">
+      <div class="messages" id="messages">
+        {% if messages %}
+          {% for msg in messages %}
+            <div class="message {% if msg.from_user == username %}from-me{% else %}to-me{% endif %}">
+              <div class="message-sender">
+                {{ msg.from_user }}
+                <span class="message-time">
+                  {{ msg.timestamp.strftime('%H:%M:%S') if msg.timestamp.__class__.__name__ == 'datetime' else msg.timestamp }}
+                </span>
+              </div>
+              {{ msg.message }}
+            </div>
+          {% endfor %}
+        {% else %}
+          <div style="text-align: center; color: #666; margin-top: 50px;">
+            {% if selected_user %}
+              No messages yet. Start the conversation!
+            {% else %}
+              Select a user to view messages
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- Input area -->
+      {% if selected_user %}
+      <div class="input-area">
+        <form method="post" action="/{{ username }}/send_message" style="display: flex; gap: 10px; width: 100%;">
+          <input type="hidden" name="to_user" value="{{ selected_user }}">
+          <input type="text" name="message" placeholder="Type your message to {{ selected_user }}..." required style="flex: 1;">
+          <button type="submit">Send</button>
+        </form>
+      </div>
+      {% else %}
+      <div class="input-area">
+        <input type="text" placeholder="Select a user to start chatting" disabled style="flex: 1;">
+        <button disabled>Send</button>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <script>
+    function selectUser(user) {
+      window.location.href = `/{{ username }}/select/${user}`;
+    }
+
+    function markAsRead(notificationId) {
+      window.location.href = `/{{ username }}/read_notification/${notificationId}`;
+    }
+
+    function clearAllNotifications() {
+      window.location.href = `/{{ username }}/clear_notifications`;
+    }
+
+    // Scroll to bottom of messages
+    const messagesDiv = document.getElementById('messages');
+    if (messagesDiv) {
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    // Auto-refresh page every 5 seconds to check for new notifications
+    setInterval(() => {
+      if (!document.hidden) {
+        window.location.reload();
+      }
+    }, 5000);
+  </script>
+</body>
+</html>
